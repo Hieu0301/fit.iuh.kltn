@@ -26,7 +26,7 @@ const initSocket = (app) => {
     cors: {
       origin: [
         "http://localhost:3000", // Cho phép trong quá trình phát triển
-        "https://khoaluantotnghiep-iuh.onrender.com", // Cho phép khi deploy
+        "https://fit-iuh-kltn.onrender.com", // Cho phép khi deploy
         "*", // Thêm dòng này để cho phép tất cả các origin
       ],
       methods: ["GET", "POST"],
