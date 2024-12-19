@@ -210,7 +210,7 @@ function AssignmentCouncil() {
   };
 
   //get danh sách để phân công
-  const handleListGroupCouncil = async (committee) => {
+  /* const handleListGroupCouncil = async (committee) => {
     if (
       !committee ||
       !committee.reviewerTeacher ||
@@ -261,88 +261,84 @@ function AssignmentCouncil() {
       setLoading(false);
     }
   };
+ */
+  const handleListGroupCouncil = async (committee) => {
+    if (
+      !committee ||
+      !committee.reviewerTeacher ||
+      committee.reviewerTeacher.length < 5
+    ) {
+      setError("Hội đồng phải có ít nhất 5 giảng viên");
+      return;
+    }
+    setLoading(true);
+    setError(null);
 
-  // const handleAssignmentCouncil = async (group) => {
-  //   // Xác nhận trước khi phân công
-  //   const result = await Swal.fire({
-  //     title: "Xác Nhận Phân Công",
-  //     text: "Bạn có chắc chắn muốn phân công nhóm này cho hội đồng báo cáo?",
-  //     icon: "question",
-  //     showCancelButton: true,
-  //     confirmButtonColor: "#3085d6",
-  //     cancelButtonColor: "#d33",
-  //     confirmButtonText: "Phân Công",
-  //     cancelButtonText: "Hủy",
-  //   });
+    try {
+      const token = localStorage.getItem("token");
+      const teacherIds = committee.reviewerTeacher.map(
+        (teacher) => teacher._id
+      );
+      const response = await axios.get(
+        `${apiUrl}/councilAssignment/get-eligible-council-students/${teacherIds[0]}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params: { secondTeacherId: teacherIds[1] },
+        }
+      );
 
-  //   if (!result.isConfirmed) return;
-  //   try {
-  //     // Sử dụng thông tin từ group được chọn
-  //     if (!selectedCommittee || !group) {
-  //       toast.warning("Vui lòng chọn hội đồng và nhóm sinh viên");
-  //       return;
-  //     }
+      if (response.data.success) {
+        // Lọc các nhóm:
+        // 1. Chưa được phân công cho bất kỳ hội đồng nào
+        // 2. Hoặc đã được phân công cho hội đồng hiện tại
+        const filteredGroups = response.data.eligibleGroups.filter((group) => {
+          // Kiểm tra nếu nhóm đã được phân công cho hội đồng hiện tại
+          const isAssignedToCurrentCommittee = committee.studentGroup?.some(
+            (assignedGroup) => assignedGroup._id === group._id
+          );
 
-  //     // Lấy ID của 2 giảng viên từ hội đồng hiện tại
-  //     const teacherIds = selectedCommittee.reviewerTeacher.map(
-  //       (teacher) => teacher._id
-  //     );
+          // Kiểm tra nếu nhóm đã được phân công cho bất kỳ hội đồng nào khác
+          const isAssignedToAnyCommittee = committees.some((comm) =>
+            comm.studentGroup?.some(
+              (assignedGroup) => assignedGroup._id === group._id
+            )
+          );
 
-  //     // Chuẩn bị payload
-  //     const payload = {
-  //       reviewPanelId: selectedCommittee._id,
-  //       teacherIds: teacherIds,
-  //       groupId: group._id, // Thay đổi ở đây từ group.groupId sang group._id
-  //     };
+          // Hiển thị nhóm nếu:
+          // - Đã được phân công cho hội đồng hiện tại
+          // - Hoặc chưa được phân công cho bất kỳ hội đồng nào
+          return isAssignedToCurrentCommittee || !isAssignedToAnyCommittee;
+        });
 
-  //     // Thực hiện gọi API
-  //     const token = localStorage.getItem("token");
-  //     const response = await axios.post(
-  //       `${apiUrl}/councilAssignment/assign-council`,
-  //       payload,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //       }
-  //     );
+        // Thêm trạng thái isAssigned cho mỗi nhóm
+        const groupsWithAssignmentStatus = filteredGroups.map((group) => ({
+          ...group,
+          isAssigned: committee.studentGroup?.some(
+            (assignedGroup) => assignedGroup._id === group._id
+          ),
+        }));
 
-  //     // Xử lý kết quả
-  //     if (response.data.success) {
-  //       toast.success("Phân công giảng viên phản biện thành công!");
+        console.log("Processed groups:", groupsWithAssignmentStatus);
 
-  //       // // Đóng modal danh sách nhóm
-  //       // setShowGroupModal(false);
-
-  //       // Tải lại danh sách hội đồng
-
-  //       // Tải lại danh sách nhóm để cập nhật trạng thái
-  //       handleListGroupCouncil(selectedCommittee);
-  //       fetchCommittees();
-  //     } else {
-  //       toast.info(
-  //         response.data.message || "Không thể phân công giảng viên phản biện"
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi khi phân công giảng viên:", error);
-
-  //     if (error.response) {
-  //       // Hiển thị thông báo lỗi từ máy chủ
-  //       toast.error(
-  //         error.response.data.message || "Lỗi từ máy chủ khi phân công"
-  //       );
-  //     } else if (error.request) {
-  //       toast.error("Không nhận được phản hồi từ máy chủ");
-  //     } else {
-  //       toast.error("Lỗi khi gửi yêu cầu phân công");
-  //     }
-  //   }
-  // };
-
+        setAssignedGroups(groupsWithAssignmentStatus);
+        setSelectedCommittee(committee);
+        setShowGroupModal(true);
+      } else {
+        setError(response.data.message || "Không thể tải danh sách nhóm");
+      }
+    } catch (err) {
+      console.error("Error in handleListGroupCouncil:", err);
+      setError("Đã xảy ra lỗi khi tải danh sách nhóm");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAssignmentCouncil = async (group) => {
+    // Xác nhận trước khi phân công
     const result = await Swal.fire({
       title: "Xác Nhận Phân Công",
       text: "Bạn có chắc chắn muốn phân công nhóm này cho hội đồng báo cáo?",
@@ -355,23 +351,26 @@ function AssignmentCouncil() {
     });
 
     if (!result.isConfirmed) return;
-
     try {
+      // Sử dụng thông tin từ group được chọn
       if (!selectedCommittee || !group) {
         toast.warning("Vui lòng chọn hội đồng và nhóm sinh viên");
         return;
       }
 
+      // Lấy ID của 2 giảng viên từ hội đồng hiện tại
       const teacherIds = selectedCommittee.reviewerTeacher.map(
         (teacher) => teacher._id
       );
 
+      // Chuẩn bị payload
       const payload = {
         reviewPanelId: selectedCommittee._id,
         teacherIds: teacherIds,
-        groupId: group._id,
+        groupId: group._id, // Thay đổi ở đây từ group.groupId sang group._id
       };
 
+      // Thực hiện gọi API
       const token = localStorage.getItem("token");
       const response = await axios.post(
         `${apiUrl}/councilAssignment/assign-council`,
@@ -384,28 +383,28 @@ function AssignmentCouncil() {
         }
       );
 
+      // Xử lý kết quả
       if (response.data.success) {
-        toast.success("Phân công giảng viên hội đồng thành công!");
+        toast.success("Phân công giảng viên phản biện thành công!");
 
-        // Cập nhật trạng thái trực tiếp trong assignedGroups
-        setAssignedGroups(prev =>
-          prev.map(g => {
-            if (g._id === group._id) {
-              return { ...g, isAssigned: true };
-            }
-            return g;
-          })
-        );
+        // Đóng modal danh sách nhóm
+        setShowGroupModal(false);
 
-        // Vẫn gọi fetchCommittees để cập nhật danh sách hội đồng
+        // Tải lại danh sách hội đồng
         fetchCommittees();
       } else {
-        toast.info(response.data.message || "Không thể phân công giảng viên phản biện");
+        toast.info(
+          response.data.message || "Không thể phân công giảng viên phản biện"
+        );
       }
     } catch (error) {
       console.error("Lỗi khi phân công giảng viên:", error);
+
       if (error.response) {
-        toast.error(error.response.data.message || "Lỗi từ máy chủ khi phân công");
+        // Hiển thị thông báo lỗi từ máy chủ
+        toast.error(
+          error.response.data.message || "Lỗi từ máy chủ khi phân công"
+        );
       } else if (error.request) {
         toast.error("Không nhận được phản hồi từ máy chủ");
       } else {
@@ -416,60 +415,12 @@ function AssignmentCouncil() {
 
 
 
-  // const handleCancelAssignmentCouncil = async (assignmentId, studentGroupId, topicId) => {
-  //   // Xác nhận trước khi hủy
-  //   const result = await Swal.fire({
-  //     title: "Xác Nhận Hủy Phân Công",
-  //     text: "Bạn có chắc chắn muốn hủy phân công nhóm này khỏi hội đồng báo cáo?",
-  //     icon: "question",
-  //     showCancelButton: true,
-  //     confirmButtonColor: "#3085d6",
-  //     cancelButtonColor: "#d33",
-  //     confirmButtonText: "Đồng ý",
-  //     cancelButtonText: "Hủy",
-  //   });
 
-  //   if (!result.isConfirmed) return;
-
-  //   try {
-  //     const token = localStorage.getItem("token");
-
-  //     const response = await axios.put(
-  //       `${apiUrl}/councilAssignment/cancel-council-assignment/${assignmentId}/${studentGroupId}/${topicId}`,
-  //       {},
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //       }
-  //     );
-
-  //     if (response.data.success) {
-  //       toast.success("Hủy phân công thành công!");
-  //       fetchCommittees();
-  //       // setShowGroupModal(false);
-  //       handleListGroupCouncil(selectedCommittee);
-  //     } else {
-  //       toast.info(response.data.message || "Không thể hủy phân công");
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi khi hủy phân công:", error);
-  //     if (error.response) {
-  //       toast.error(error.response.data.message || "Lỗi từ máy chủ khi hủy phân công");
-  //     } else if (error.request) {
-  //       toast.error("Không nhận được phản hồi từ máy chủ");
-  //     } else {
-  //       toast.error("Lỗi khi gửi yêu cầu hủy phân công");
-  //     }
-  //   }
-  // };
-
-
-  const handleCancelAssignmentCouncil = async (assignmentId, studentGroupId, topicId) => {
+  const handleCancelAssignmentCouncil = async (assignmentId) => {
+    // Xác nhận trước khi tạo
     const result = await Swal.fire({
-      title: "Xác Nhận Hủy Phân Công",
-      text: "Bạn có chắc chắn muốn hủy phân công nhóm này khỏi hội đồng báo cáo?",
+      title: "Xác Nhận Tạo Hội Đồng Báo Cáo",
+      text: "Bạn có chắc chắn muốn tạo hội đồng báo cáo với 2 giảng viên này?",
       icon: "question",
       showCancelButton: true,
       confirmButtonColor: "#3085d6",
@@ -479,10 +430,15 @@ function AssignmentCouncil() {
     });
 
     if (!result.isConfirmed) return;
-
     try {
+      // Lấy token từ localStorage
       const token = localStorage.getItem("token");
 
+      // Lấy thông tin studentGroupId và topicId từ selectedCommittee
+      const studentGroupId = selectedCommittee.studentGroup[0]._id; // Lấy ID của nhóm đầu tiên
+      const topicId = selectedCommittee.topic[0]._id; // Lấy ID của đề tài đầu tiên
+
+      // Gọi API hủy phân công với đầy đủ thông tin
       const response = await axios.put(
         `${apiUrl}/councilAssignment/cancel-council-assignment/${assignmentId}/${studentGroupId}/${topicId}`,
         {},
@@ -494,31 +450,34 @@ function AssignmentCouncil() {
         }
       );
 
+      // Kiểm tra kết quả từ server
       if (response.data.success) {
+        // Hiển thị thông báo thành công
         toast.success("Hủy phân công thành công!");
 
-        // Cập nhật trạng thái trực tiếp trong assignedGroups
-        setAssignedGroups(prev =>
-          prev.map(g => {
-            if (g._id === studentGroupId) {
-              return { ...g, isAssigned: false };
-            }
-            return g;
-          })
-        );
-
-        // Vẫn gọi fetchCommittees để cập nhật danh sách hội đồng
+        // Cập nhật danh sách hội đồng
         fetchCommittees();
+
+        // Đóng modal nếu đang mở
+        setShowGroupModal(false);
       } else {
+        // Hiển thị thông báo từ server nếu có
         toast.info(response.data.message || "Không thể hủy phân công");
       }
     } catch (error) {
       console.error("Lỗi khi hủy phân công:", error);
+
+      // Xử lý các loại lỗi khác nhau
       if (error.response) {
-        toast.error(error.response.data.message || "Lỗi từ máy chủ khi hủy phân công");
+        // Lỗi từ phía server
+        toast.error(
+          error.response.data.message || "Lỗi từ máy chủ khi hủy phân công"
+        );
       } else if (error.request) {
+        // Không nhận được phản hồi từ server
         toast.error("Không nhận được phản hồi từ máy chủ");
       } else {
+        // Lỗi trong quá trình gửi request
         toast.error("Lỗi khi gửi yêu cầu hủy phân công");
       }
     }
@@ -526,25 +485,11 @@ function AssignmentCouncil() {
 
 
 
-  // const filteredTeachers = teachers.filter(
-  //   (teacher) =>
-  //     teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //     teacher.department.toLowerCase().includes(searchTerm.toLowerCase())
-  // );
-
-  const filteredTeachers = teachers.filter((teacher) => {
-    // Kiểm tra nếu teacher hoặc các thuộc tính là undefined/null
-    if (!teacher || !searchTerm) return true;  // Nếu không có từ khóa tìm kiếm, hiển thị tất cả
-
-    const searchTermLower = searchTerm.toLowerCase();
-    const teacherName = teacher.name || "";  // Nếu name là undefined/null thì gán chuỗi rỗng
-    const teacherDepartment = teacher.department || "";  // Nếu department là undefined/null thì gán chuỗi rỗng
-
-    return (
-      teacherName.toLowerCase().includes(searchTermLower) ||
-      teacherDepartment.toLowerCase().includes(searchTermLower)
-    );
-  });
+  const filteredTeachers = teachers.filter(
+    (teacher) =>
+      teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.department.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
@@ -837,7 +782,7 @@ function AssignmentCouncil() {
                   <span>&times;</span>
                 </button>
               </div>
-              <div className="modal-body-review">
+              <div className="modal-body">
                 {loading ? (
                   <p>Đang tải...</p>
                 ) : error ? (
@@ -890,7 +835,7 @@ function AssignmentCouncil() {
                         </table>
 
                         {/* Điều kiện hiển thị nút phân công hoặc hủy phân công */}
-                        {/* <button
+                        <button
                           className="btn btn-warning"
                           onClick={() =>
                             group.isAssigned
@@ -901,19 +846,7 @@ function AssignmentCouncil() {
                           }
                         >
                           {group.isAssigned ? "Hủy phân công" : "Phân công"}
-                        </button> */}
-
-                        <button
-                          className="btn btn-warning"
-                          onClick={() =>
-                            group.isAssigned
-                              ? handleCancelAssignmentCouncil(selectedCommittee._id, group._id, group.topic._id)
-                              : handleAssignmentCouncil(group)
-                          }
-                        >
-                          {group.isAssigned ? "Hủy phân công" : "Phân công"}
                         </button>
-
                       </div>
                     </div>
                   ))

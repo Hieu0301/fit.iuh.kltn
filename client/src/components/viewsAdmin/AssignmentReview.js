@@ -26,6 +26,8 @@ function AssignmentReview() {
   const committeesPerPage = 6;
   const groupsPerPage = 9; // Số lượng nhóm trên mỗi trang
 
+  const [isProcessing, setIsProcessing] = useState(false);
+
   useEffect(() => {
     fetchTeachers();
     fetchCommittees();
@@ -145,102 +147,7 @@ function AssignmentReview() {
     }
   };
 
-  // const handleListGroupStudent = async (committee) => {
-  //   if (
-  //     !committee ||
-  //     !committee.reviewerTeacher ||
-  //     committee.reviewerTeacher.length !== 2
-  //   ) {
-  //     setError("Hội đồng phải có đúng 2 giảng viên");
-  //     return;
-  //   }
-  //   setLoading(true);
-  //   setError(null);
-
-  //   try {
-  //     const token = localStorage.getItem("token");
-  //     const teacherIds = committee.reviewerTeacher.map(
-  //       (teacher) => teacher._id
-  //     );
-  //     const response = await axios.get(
-  //       `${apiUrl}/reviewAssignment/get-groups-for-review/${teacherIds[0]}`,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //         params: { secondTeacherId: teacherIds[1] },
-  //       }
-  //     );
-  //     if (response.data.success) {
-  //       // Thêm logic kiểm tra xem nhóm đã được phân công hay chưa
-
-  //       setAssignedGroups(response.data.groups);
-  //       setSelectedCommittee(committee);
-  //       setShowGroupModal(true);
-  //     } else {
-  //       setError(response.data.message || "Không thể tải danh sách nhóm");
-  //     }
-  //   } catch (err) {
-  //     setError("Đã xảy ra lỗi khi tải danh sách nhóm");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
-
-  // const handleListGroupStudent = async (committee) => {
-  //   if (
-  //     !committee ||
-  //     !committee.reviewerTeacher ||
-  //     committee.reviewerTeacher.length !== 2
-  //   ) {
-  //     setError("Hội đồng phải có đúng 2 giảng viên");
-  //     return;
-  //   }
-  //   setLoading(true);
-  //   setError(null);
-
-  //   try {
-  //     const token = localStorage.getItem("token");
-  //     const teacherIds = committee.reviewerTeacher.map(
-  //       (teacher) => teacher._id
-  //     );
-  //     const response = await axios.get(
-  //       `${apiUrl}/reviewAssignment/get-groups-for-review/${teacherIds[0]}`,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //         params: { secondTeacherId: teacherIds[1] },
-  //       }
-  //     );
-
-  //     if (response.data.success) {
-  //       // Thêm logic kiểm tra xem nhóm đã được phân công hay chưa
-  //       const groupsWithAssignmentStatus = response.data.groups.map(
-  //         (group) => ({
-  //           ...group,
-  //           isAssigned: committee.studentGroup.some(
-  //             (assignedGroup) => assignedGroup._id === group.groupId
-  //           ),
-  //         })
-  //       );
-
-  //       setAssignedGroups(groupsWithAssignmentStatus);
-  //       setSelectedCommittee(committee);
-  //       setShowGroupModal(true);
-  //     } else {
-  //       setError(response.data.message || "Không thể tải danh sách nhóm");
-  //     }
-  //   } catch (err) {
-  //     setError("Đã xảy ra lỗi khi tải danh sách nhóm");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
+  //Lấy danh sách sinh viên
   const handleListGroupStudent = async (committee) => {
     if (
       !committee ||
@@ -259,10 +166,6 @@ function AssignmentReview() {
         (teacher) => teacher._id
       );
 
-      // Thêm console.log để debug
-      console.log("Committee:", committee);
-      console.log("Teacher IDs:", teacherIds);
-
       const response = await axios.get(
         `${apiUrl}/reviewAssignment/get-groups-for-review/${teacherIds[0]}`,
         {
@@ -272,24 +175,41 @@ function AssignmentReview() {
           },
           params: {
             secondTeacherId: teacherIds[1],
-            reviewPanelId: committee._id, // Thêm ID của hội đồng
+            reviewPanelId: committee._id,
           },
         }
       );
 
       if (response.data.success) {
-        // Đảm bảo committee.studentGroup tồn tại
-        const studentGroup = committee.studentGroup || [];
+        // Lọc các nhóm:
+        // 1. Chưa được phân công cho bất kỳ hội đồng nào
+        // 2. Hoặc đã được phân công cho hội đồng hiện tại
+        const filteredGroups = response.data.groups.filter((group) => {
+          // Nếu nhóm đã được phân công cho hội đồng hiện tại
+          const isAssignedToCurrentCommittee = committee.studentGroup?.some(
+            (assignedGroup) => assignedGroup._id === group.groupId
+          );
 
-        // Map qua các nhóm và thêm trạng thái isAssigned
-        const groupsWithAssignmentStatus = response.data.groups.map(
-          (group) => ({
-            ...group,
-            isAssigned: studentGroup.some(
+          // Nếu nhóm đã được phân công cho bất kỳ hội đồng nào
+          const isAssignedToAnyCommittee = committees.some((comm) =>
+            comm.studentGroup?.some(
               (assignedGroup) => assignedGroup._id === group.groupId
-            ),
-          })
-        );
+            )
+          );
+
+          // Hiển thị nhóm nếu:
+          // - Đã được phân công cho hội đồng hiện tại
+          // - Hoặc chưa được phân công cho bất kỳ hội đồng nào
+          return isAssignedToCurrentCommittee || !isAssignedToAnyCommittee;
+        });
+
+        // Thêm trạng thái isAssigned cho mỗi nhóm
+        const groupsWithAssignmentStatus = filteredGroups.map((group) => ({
+          ...group,
+          isAssigned: committee.studentGroup?.some(
+            (assignedGroup) => assignedGroup._id === group.groupId
+          ),
+        }));
 
         console.log("Processed groups:", groupsWithAssignmentStatus);
 
@@ -308,7 +228,6 @@ function AssignmentReview() {
       setLoading(false);
     }
   };
-
 
   const handledeleteGroup = async (reviewPanelId) => {
     // Xác nhận trước khi xóa
@@ -349,137 +268,9 @@ function AssignmentReview() {
     }
   };
 
-  // const handleAssignGroup = async (group) => {
-  //   // Xác nhận trước khi phân công
-  //   const result = await Swal.fire({
-  //     title: "Xác Nhận Phân Công",
-  //     text: "Bạn có chắc chắn muốn phân công nhóm này cho hội đồng?",
-  //     icon: "question",
-  //     showCancelButton: true,
-  //     confirmButtonColor: "#3085d6",
-  //     cancelButtonColor: "#d33",
-  //     confirmButtonText: "Phân Công",
-  //     cancelButtonText: "Hủy",
-  //   });
-
-  //   if (!result.isConfirmed) return;
-
-  //   try {
-  //     // Sử dụng thông tin từ group được chọn
-  //     if (!selectedCommittee || !group) {
-  //       toast.warning("Vui lòng chọn hội đồng và nhóm sinh viên");
-  //       return;
-  //     }
-
-  //     // Lấy ID của 2 giảng viên từ hội đồng hiện tại
-  //     const teacherIds = selectedCommittee.reviewerTeacher.map(
-  //       (teacher) => teacher._id
-  //     );
-
-  //     // Chuẩn bị payload
-  //     const payload = {
-  //       reviewPanelId: selectedCommittee._id,
-  //       teacherIds: teacherIds,
-  //       groupId: group.groupId,
-  //     };
-
-  //     // Thực hiện gọi API
-  //     const token = localStorage.getItem("token");
-  //     const response = await axios.post(
-  //       `${apiUrl}/reviewAssignment/assign-reviewer`,
-  //       payload,
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //       }
-  //     );
-
-  //     // Xử lý kết quả
-  //     if (response.data.success) {
-  //       toast.success("Phân công giảng viên phản biện thành công!");
-
-  //       // Đóng modal danh sách nhóm
-  //       setShowGroupModal(false);
-
-  //       // Tải lại danh sách hội đồng
-  //       fetchCommittees();
-  //     } else {
-  //       toast.info(
-  //         response.data.message || "Không thể phân công giảng viên phản biện"
-  //       );
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi khi phân công giảng viên:", error);
-
-  //     if (error.response) {
-  //       // Hiển thị thông báo lỗi từ máy chủ
-  //       toast.error(
-  //         error.response.data.message || "Lỗi từ máy chủ khi phân công"
-  //       );
-  //     } else if (error.request) {
-  //       toast.error("Không nhận được phản hồi từ máy chủ");
-  //     } else {
-  //       toast.error("Lỗi khi gửi yêu cầu phân công");
-  //     }
-  //   }
-  // };
-
-
-  // const handleCancelAssignment = async (group) => {
-  //   // Xác nhận trước khi hủy phân công
-  //   const result = await Swal.fire({
-  //     title: "Xác Nhận Hủy Phân Công",
-  //     text: "Bạn có chắc chắn muốn hủy phân công này? Thao tác này không thể hoàn tác.",
-  //     icon: "warning",
-  //     showCancelButton: true,
-  //     confirmButtonColor: "#d33",
-  //     cancelButtonColor: "#3085d6",
-  //     confirmButtonText: "Hủy Phân Công",
-  //     cancelButtonText: "Đóng",
-  //   });
-
-  //   if (!result.isConfirmed) return;
-
-  //   try {
-  //     const token = localStorage.getItem("token");
-
-  //     // Sử dụng thông tin từ group được truyền vào
-  //     const studentGroupId = group.groupId;
-  //     const topicId = group.topicId; // Giả sử topicId có trong object group
-
-  //     const response = await axios.put(
-  //       `${apiUrl}/reviewAssignment/cancel-assignment/${selectedCommittee._id}/${studentGroupId}/${topicId}`,
-  //       {},
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //       }
-  //     );
-
-  //     if (response.data.success) {
-  //       toast.success("Hủy phân công thành công!");
-  //       fetchCommittees();
-  //       setShowGroupModal(false);
-  //     } else {
-  //       toast.info(response.data.message || "Không thể hủy phân công");
-  //     }
-  //   } catch (error) {
-  //     console.error("Lỗi khi hủy phân công:", error);
-  //     if (error.response) {
-  //       toast.error(error.response.data.message || "Lỗi từ máy chủ khi hủy phân công");
-  //     } else if (error.request) {
-  //       toast.error("Không nhận được phản hồi từ máy chủ");
-  //     } else {
-  //       toast.error("Lỗi khi gửi yêu cầu hủy phân công");
-  //     }
-  //   }
-  // };
-
-
+  //Phân công nhóm sinh viên cho hội đồng
+  // Tạo biến state cục bộ cho nhóm đang được xử lý
+  const [processingGroupId, setProcessingGroupId] = useState(null);
   const handleAssignGroup = async (group) => {
     const result = await Swal.fire({
       title: "Xác Nhận Phân Công",
@@ -495,6 +286,9 @@ function AssignmentReview() {
     if (!result.isConfirmed) return;
 
     try {
+      // Set loading state chỉ cho nhóm đang được xử lý
+      setProcessingGroupId(group.groupId);
+
       if (!selectedCommittee || !group) {
         toast.warning("Vui lòng chọn hội đồng và nhóm sinh viên");
         return;
@@ -526,8 +320,8 @@ function AssignmentReview() {
         toast.success("Phân công giảng viên phản biện thành công!");
 
         // Cập nhật trạng thái trực tiếp trong assignedGroups
-        setAssignedGroups(prev =>
-          prev.map(g => {
+        setAssignedGroups((prev) =>
+          prev.map((g) => {
             if (g.groupId === group.groupId) {
               return { ...g, isAssigned: true };
             }
@@ -535,7 +329,7 @@ function AssignmentReview() {
           })
         );
 
-        // Vẫn gọi fetchCommittees để cập nhật danh sách hội đồng
+        // Cập nhật danh sách hội đồng
         fetchCommittees();
       } else {
         toast.info(
@@ -553,6 +347,9 @@ function AssignmentReview() {
       } else {
         toast.error("Lỗi khi gửi yêu cầu phân công");
       }
+    } finally {
+      // Reset loading state cho nhóm đã xử lý xong
+      setProcessingGroupId(null);
     }
   };
 
@@ -571,6 +368,9 @@ function AssignmentReview() {
     if (!result.isConfirmed) return;
 
     try {
+      // Set loading state chỉ cho nhóm đang được xử lý
+      setProcessingGroupId(group.groupId);
+
       const token = localStorage.getItem("token");
       const studentGroupId = group.groupId;
       const topicId = group.topicId;
@@ -590,8 +390,8 @@ function AssignmentReview() {
         toast.success("Hủy phân công thành công!");
 
         // Cập nhật trạng thái trực tiếp trong assignedGroups
-        setAssignedGroups(prev =>
-          prev.map(g => {
+        setAssignedGroups((prev) =>
+          prev.map((g) => {
             if (g.groupId === group.groupId) {
               return { ...g, isAssigned: false };
             }
@@ -599,7 +399,7 @@ function AssignmentReview() {
           })
         );
 
-        // Vẫn gọi fetchCommittees để cập nhật danh sách hội đồng
+        // Cập nhật danh sách hội đồng
         fetchCommittees();
       } else {
         toast.info(response.data.message || "Không thể hủy phân công");
@@ -607,12 +407,17 @@ function AssignmentReview() {
     } catch (error) {
       console.error("Lỗi khi hủy phân công:", error);
       if (error.response) {
-        toast.error(error.response.data.message || "Lỗi từ máy chủ khi hủy phân công");
+        toast.error(
+          error.response.data.message || "Lỗi từ máy chủ khi hủy phân công"
+        );
       } else if (error.request) {
         toast.error("Không nhận được phản hồi từ máy chủ");
       } else {
         toast.error("Lỗi khi gửi yêu cầu hủy phân công");
       }
+    } finally {
+      // Reset loading state cho nhóm đã xử lý xong
+      setProcessingGroupId(null);
     }
   };
 
@@ -624,11 +429,11 @@ function AssignmentReview() {
 
   const filteredTeachers = teachers.filter((teacher) => {
     // Kiểm tra nếu teacher hoặc các thuộc tính là undefined/null
-    if (!teacher || !searchTerm) return true;  // Nếu không có từ khóa tìm kiếm, hiển thị tất cả
+    if (!teacher || !searchTerm) return true; // Nếu không có từ khóa tìm kiếm, hiển thị tất cả
 
     const searchTermLower = searchTerm.toLowerCase();
-    const teacherName = teacher.name || "";  // Nếu name là undefined/null thì gán chuỗi rỗng
-    const teacherDepartment = teacher.department || "";  // Nếu department là undefined/null thì gán chuỗi rỗng
+    const teacherName = teacher.name || ""; // Nếu name là undefined/null thì gán chuỗi rỗng
+    const teacherDepartment = teacher.department || ""; // Nếu department là undefined/null thì gán chuỗi rỗng
 
     return (
       teacherName.toLowerCase().includes(searchTermLower) ||
@@ -835,8 +640,8 @@ function AssignmentReview() {
                     <div key={teacher._id} className="col-md-4 mb-3">
                       <div
                         className={`card teacher-card ${selectedLecturers.some((t) => t._id === teacher._id)
-                          ? "selected"
-                          : ""
+                            ? "selected"
+                            : ""
                           }`}
                         onClick={() => handleTeacherSelect(teacher)}
                         style={{
@@ -897,8 +702,8 @@ function AssignmentReview() {
                 <button
                   type="button"
                   className={`btn ${selectedLecturers.length !== 2
-                    ? "btn-secondary"
-                    : "btn-success"
+                      ? "btn-secondary"
+                      : "btn-success"
                     }`}
                   onClick={createCommittee}
                   disabled={selectedLecturers.length !== 2}
@@ -954,13 +759,18 @@ function AssignmentReview() {
                             </div>
 
                             <button
-                              className={`btn ${group.isAssigned ? "btn-danger" : "btn-warning"}`}
+                              className={`btn ${group.isAssigned ? "btn-danger" : "btn-warning"
+                                }`}
                               onClick={() =>
                                 group.isAssigned
                                   ? handleCancelAssignment(group)
                                   : handleAssignGroup(group)
                               }
+                              disabled={isProcessing}
                             >
+                              {isProcessing ? (
+                                <span className="spinner-border spinner-border-sm mr-2" />
+                              ) : null}
                               {group.isAssigned ? "Hủy phân công" : "Phân công"}
                             </button>
                           </div>
