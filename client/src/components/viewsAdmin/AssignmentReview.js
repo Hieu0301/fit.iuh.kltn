@@ -189,6 +189,58 @@ function AssignmentReview() {
   // };
 
 
+  // const handleListGroupStudent = async (committee) => {
+  //   if (
+  //     !committee ||
+  //     !committee.reviewerTeacher ||
+  //     committee.reviewerTeacher.length !== 2
+  //   ) {
+  //     setError("Hội đồng phải có đúng 2 giảng viên");
+  //     return;
+  //   }
+  //   setLoading(true);
+  //   setError(null);
+
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     const teacherIds = committee.reviewerTeacher.map(
+  //       (teacher) => teacher._id
+  //     );
+  //     const response = await axios.get(
+  //       `${apiUrl}/reviewAssignment/get-groups-for-review/${teacherIds[0]}`,
+  //       {
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //           "Content-Type": "application/json",
+  //         },
+  //         params: { secondTeacherId: teacherIds[1] },
+  //       }
+  //     );
+
+  //     if (response.data.success) {
+  //       // Thêm logic kiểm tra xem nhóm đã được phân công hay chưa
+  //       const groupsWithAssignmentStatus = response.data.groups.map(
+  //         (group) => ({
+  //           ...group,
+  //           isAssigned: committee.studentGroup.some(
+  //             (assignedGroup) => assignedGroup._id === group.groupId
+  //           ),
+  //         })
+  //       );
+
+  //       setAssignedGroups(groupsWithAssignmentStatus);
+  //       setSelectedCommittee(committee);
+  //       setShowGroupModal(true);
+  //     } else {
+  //       setError(response.data.message || "Không thể tải danh sách nhóm");
+  //     }
+  //   } catch (err) {
+  //     setError("Đã xảy ra lỗi khi tải danh sách nhóm");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
   const handleListGroupStudent = async (committee) => {
     if (
       !committee ||
@@ -206,6 +258,11 @@ function AssignmentReview() {
       const teacherIds = committee.reviewerTeacher.map(
         (teacher) => teacher._id
       );
+
+      // Thêm console.log để debug
+      console.log("Committee:", committee);
+      console.log("Teacher IDs:", teacherIds);
+
       const response = await axios.get(
         `${apiUrl}/reviewAssignment/get-groups-for-review/${teacherIds[0]}`,
         {
@@ -213,29 +270,40 @@ function AssignmentReview() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          params: { secondTeacherId: teacherIds[1] },
+          params: {
+            secondTeacherId: teacherIds[1],
+            reviewPanelId: committee._id, // Thêm ID của hội đồng
+          },
         }
       );
 
       if (response.data.success) {
-        // Thêm logic kiểm tra xem nhóm đã được phân công hay chưa
+        // Đảm bảo committee.studentGroup tồn tại
+        const studentGroup = committee.studentGroup || [];
+
+        // Map qua các nhóm và thêm trạng thái isAssigned
         const groupsWithAssignmentStatus = response.data.groups.map(
           (group) => ({
             ...group,
-            isAssigned: committee.studentGroup.some(
+            isAssigned: studentGroup.some(
               (assignedGroup) => assignedGroup._id === group.groupId
             ),
           })
         );
+
+        console.log("Processed groups:", groupsWithAssignmentStatus);
 
         setAssignedGroups(groupsWithAssignmentStatus);
         setSelectedCommittee(committee);
         setShowGroupModal(true);
       } else {
         setError(response.data.message || "Không thể tải danh sách nhóm");
+        setAssignedGroups([]);
       }
     } catch (err) {
+      console.error("Error in handleListGroupStudent:", err);
       setError("Đã xảy ra lỗi khi tải danh sách nhóm");
+      setAssignedGroups([]);
     } finally {
       setLoading(false);
     }
