@@ -416,11 +416,10 @@ const ManageStudentAccounts = () => {
           response.data.duplicateUsernames &&
           response.data.duplicateUsernames.length > 0
         ) {
-          message += ` ${
-            response.data.duplicateUsernames.length
-          } tài khoản bị trùng username: ${response.data.duplicateUsernames.join(
-            ", "
-          )}`;
+          message += ` ${response.data.duplicateUsernames.length
+            } tài khoản bị trùng username: ${response.data.duplicateUsernames.join(
+              ", "
+            )}`;
           icon = "warning";
         }
 
@@ -510,6 +509,18 @@ const ManageStudentAccounts = () => {
           )}
         </Button>
       </Box>
+
+      <Typography
+        variant="body2"
+        sx={{
+          color: "red",
+          fontStyle: "italic",
+          marginBottom: 2,
+        }}
+      >
+        * Tải file Excel phải có đủ thông tin như: username, password,
+        studentId, name, phone, email, class, major, gender, phải đúng định dạng.
+      </Typography>
 
       {/* Tìm kiếm tài khoản */}
       <TextField

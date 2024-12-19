@@ -404,11 +404,10 @@ const ManageTeacherAccounts = () => {
           response.data.duplicateUsernames &&
           response.data.duplicateUsernames.length > 0
         ) {
-          message += ` ${
-            response.data.duplicateUsernames.length
-          } tài khoản bị trùng username: ${response.data.duplicateUsernames.join(
-            ", "
-          )}`;
+          message += ` ${response.data.duplicateUsernames.length
+            } tài khoản bị trùng username: ${response.data.duplicateUsernames.join(
+              ", "
+            )}`;
           icon = "warning";
         }
 
@@ -498,6 +497,18 @@ const ManageTeacherAccounts = () => {
           )}
         </Button>
       </Box>
+
+      <Typography
+        variant="body2"
+        sx={{
+          color: "red",
+          fontStyle: "italic",
+          marginBottom: 2,
+        }}
+      >
+        * Tải file Excel phải có đủ thông tin như: username, password, teacherId,
+        name, phone, email, major, gender, phải đúng định dạng.
+      </Typography>
       {/* Tìm kiếm tài khoản */}
       <TextField
         label="Tìm kiếm theo Tên đăng nhập hoặc Mã giảng viên"
